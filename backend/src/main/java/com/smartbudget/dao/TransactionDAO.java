@@ -1,6 +1,6 @@
 package com.smartbudget.dao;
 
-import com.smartbudget.entity.Transaction;
+import com.smartbudget.model.Transaction;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,49 +24,49 @@ import java.util.List;
 // ============================================================
 public class TransactionDAO {
 
-    // -------------------------------------------------------
-    // TODO TICKET-F036: Implement insert(Transaction t)
-    // -------------------------------------------------------
-    // WHAT: Inserts a new transaction record into the database.
-    //       Uses a PreparedStatement with ? placeholders for safe parameter binding.
-    //
-    // HOW:  1. Write the SQL INSERT statement with 6 placeholders (?)
-    //          for: user_id, category_id, amount, txn_date, description, type
-    //       2. Get a Connection from DatabaseConnection.getConnection()
-    //       3. Create a PreparedStatement from the connection using conn.prepareStatement(sql)
-    //       4. Set each parameter using ps.setLong(), ps.setBigDecimal(), ps.setDate(), ps.setString()
-    //          IMPORTANT: ps.setDate() requires java.sql.Date, not java.time.LocalDate.
-    //          Convert using: Date.valueOf(t.getTxnDate())
-    //       5. Call ps.executeUpdate() to run the INSERT
-    //       6. Use try-with-resources to auto-close Connection and PreparedStatement
-    //
-    // WHY:  PreparedStatement prevents SQL injection by separating SQL code from data.
-    //       The database treats ? values as data, never as SQL commands.
-    //       try-with-resources ensures connections are closed even if an exception occurs.
-    //
-    // OBSERVE: After implementing, call insert() with a valid Transaction object.
-    //          Then call getAll() — your new record should appear in the list.
+    public void insert(Transaction t) throws SQLException {
+        String sql = """
+                INSERT INTO transactions
+                    (user_id, category_id, amount, txn_date, description, type)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """;
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, t.getUserId());
+            ps.setInt(2, t.getCategoryId());
+            ps.setBigDecimal(3, t.getAmount());
+            ps.setDate(4, Date.valueOf(t.getTxnDate()));
+            ps.setString(5, t.getDescription());
+            ps.setString(6, t.getType());
+            ps.executeUpdate();
+        }
+    }
 
-    // -------------------------------------------------------
-    // TODO TICKET-F037: Implement getAll() → List<Transaction>
-    // -------------------------------------------------------
-    // WHAT: Retrieves ALL transactions from the database and returns them as a Java List.
-    //       This is a "read" operation — it doesn't modify data.
-    //
-    // HOW:  1. Write the SQL: SELECT * FROM transactions ORDER BY txn_date DESC
-    //       2. Get a Connection, create a Statement (not PreparedStatement — no parameters needed)
-    //       3. Call stmt.executeQuery(sql) to get a ResultSet
-    //       4. Loop through the ResultSet with while(rs.next())
-    //       5. For each row, create a Transaction object and populate its fields from the ResultSet
-    //          using rs.getLong("txn_id"), rs.getBigDecimal("amount"), rs.getDate("txn_date").toLocalDate(), etc.
-    //       6. Add each Transaction to an ArrayList
-    //       7. Return the list
-    //
-    // WHY:  This is the most common database operation. The while(rs.next()) pattern
-    //       is fundamental JDBC — rs.next() moves to the next row, returns false when done.
-    //
-    // OBSERVE: After implementing, call getAll() and print each transaction.
-    //          You should see all records from the database.
+
+    public List<Transaction> getAll() throws SQLException {
+        String sql = "SELECT txn_id, user_id, category_id, amount, txn_date, description, type FROM transactions ORDER BY txn_date DESC";
+        List<Transaction> list = new ArrayList<>();
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+        }
+        return list;
+    }
+
+    private static Transaction mapRow(ResultSet rs) throws SQLException {
+        return new Transaction(
+                rs.getInt("txn_id"),
+                rs.getInt("user_id"),
+                rs.getInt("category_id"),
+                rs.getBigDecimal("amount"),
+                rs.getDate("txn_date").toLocalDate(),
+                rs.getString("description"),
+                rs.getString("type")
+        );
+    }
 
     // -------------------------------------------------------
     // TODO TICKET-F038: Implement getByUserId(int userId) → List<Transaction>
@@ -86,6 +86,25 @@ public class TransactionDAO {
     //
     // OBSERVE: Call getByUserId(1) — you should only see transactions for user 1.
     //          Call getByUserId(999) — you should get an empty list (no crash).
+    public List<Transaction> getByUserId(int userId) throws SQLException {
+        String sql = """
+                SELECT txn_id, user_id, category_id, amount, txn_date, description, type
+                FROM transactions
+                WHERE user_id = ?
+                ORDER BY txn_date DESC, txn_id DESC
+                """;
+        List<Transaction> list = new ArrayList<>();
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+        }
+        return list;
+    }
 
     // -------------------------------------------------------
     // TODO TICKET-F039: Implement delete(int txnId)
@@ -103,4 +122,17 @@ public class TransactionDAO {
     //
     // OBSERVE: Call delete() with a valid ID, then getAll() — the record should be gone.
     //          Call delete() with a non-existent ID — no crash, just a warning message.
+    public int delete(int txnId) throws SQLException {
+        String sql = "DELETE FROM transactions WHERE txn_id = ?";
+        try (Connection c = DatabaseConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, txnId);
+            int rowsAffected = ps.executeUpdate();
+            if (rowsAffected == 0) {
+                System.err.println("Warning: No transaction record found with txn_id=" + txnId);
+            }
+            return rowsAffected;
+        }
+    }
+
 }
