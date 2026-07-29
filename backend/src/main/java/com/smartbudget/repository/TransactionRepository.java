@@ -2,7 +2,13 @@ package com.smartbudget.repository;
 
 import com.smartbudget.entity.Transaction;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 // ============================================================
 // TICKET-F051 (Day 5, Sprint 4) — Transaction Repository
@@ -31,8 +37,27 @@ import org.springframework.stereotype.Repository;
 //       implementation classes at runtime using proxies.
 //
 // ============================================================
-@Repository
+
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
+    /** 1) All transactions for a user, newest first. */
+    List<Transaction> findByUser_UserIdOrderByTxnDateDesc(Long userId);
+
+    /** 2) Filter by 'INCOME' or 'EXPENSE'. */
+    List<Transaction> findByType(String type);
+
+    /** 3) Inclusive date range. */
+    List<Transaction> findByTxnDateBetween(LocalDate from, LocalDate to);
+
+    /** 4) Sum amounts for a user + type. COALESCE keeps result non-null. */
+    @Query("""
+           SELECT COALESCE(SUM(t.amount), 0)
+           FROM   Transaction t
+           WHERE  t.user.userId = :userId
+             AND  t.type        = :type
+           """)
+    BigDecimal sumByUserAndType(@Param("userId") Long userId,
+                                @Param("type")   String type);    
 
     // -------------------------------------------------------
     // TODO TICKET-F051: Step 1 — Add findByUser_UserIdOrderByTxnDateDesc()
