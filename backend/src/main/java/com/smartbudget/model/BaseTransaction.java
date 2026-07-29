@@ -39,6 +39,41 @@ public abstract class BaseTransaction {
     //
     // OBSERVE: After adding fields, your IDE should show them as unused (yellow underline).
     //          That's expected — they'll be used once you add the constructor.
+    protected int txnId;
+    protected BigDecimal amount;
+    protected LocalDate txnDate;
+    protected String description;
+
+    public BaseTransaction(int txnId, BigDecimal amount,
+                           LocalDate txnDate, String description) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidTransactionException(
+                "Amount must be greater than zero, got: " + amount);
+        }
+        if (txnDate == null || txnDate.isAfter(LocalDate.now())) {
+            throw new InvalidTransactionException(
+                "Transaction date cannot be in the future: " + txnDate);
+        }
+        this.txnId       = txnId;
+        this.amount      = amount;
+        this.txnDate     = txnDate;
+        this.description = description;
+    }
+
+    public abstract String getType();
+
+    public int getTxnId()              { return txnId; }
+    public BigDecimal getAmount()      { return amount; }
+    public LocalDate getTxnDate()      { return txnDate; }
+    public String getDescription()     { return description; }
+
+    @Override
+    public String toString() {
+        return String.format("[%s] id=%d | %s | %s | %s",
+                getType(), txnId, amount, txnDate, description);
+    }
+
+
 
     // -------------------------------------------------------
     // TODO TICKET-F021: Step 2 — Constructor with validation
